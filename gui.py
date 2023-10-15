@@ -5,11 +5,13 @@ from action import Action
 
 class GUI:
     """Graphical user interface."""
-    root: tk.Widget = ...
-    menu_bar: tk.Widget = ...
-    chart_fr: tk.Widget = ...
-    action_fr: tk.Widget = ...
-    design_fr: tk.Widget = ...
+    root: tk.Tk = ...
+    menu_bar: tk.Menu = ...
+    holder_fr: tk.Frame = ...
+    action_fr: tk.Frame = ...
+    design_fr: tk.Frame = ...
+    canvas: tk.Canvas = ...
+    canvas_window: tk.Frame = ...
     action_copy : tk.Widget = ...
     
     def __init__(self, title: str=None) -> None:
@@ -59,6 +61,28 @@ class GUI:
             return True
         return False
 
+    def on_left_click_canvas(self, event: tk.Event) -> None:
+        """Calls canvas' scan_mark function
+        
+        This function saves the mouse's position to be later used with
+        the scan_dragto function.
+        
+        Args:
+            event: Tkinter event.
+        """
+        self.canvas.scan_mark(event.x, event.y)
+
+    def on_drag_canvas(self, event: tk.Event) -> None:
+        """Calls canvas' scan_dragto function
+        
+        Using the mouse position saved with scan_mark, 
+        simulate the canvas being dragged around.
+        
+        Args:
+            event: Tkinter event.
+        """
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+
     def on_drag_action(self, event: tk.Event, widget: tk.Widget=None) -> None:
         """Drags copy of an action to mouse position.
         
@@ -69,7 +93,7 @@ class GUI:
             widget: The tkinter widget to grab height and width from.
         """
         mouse_x, mouse_y = event.x_root, event.y_root
-        chart_fr_x, chart_fr_y = self.chart_fr.winfo_rootx(), self.chart_fr.winfo_rooty()
+        chart_fr_x, chart_fr_y = self.holder_fr.winfo_rootx(), self.holder_fr.winfo_rooty()
 
         if widget is None:
             offset_x, offset_y = self.action_copy.winfo_width() // 2, self.action_copy.winfo_height() // 2
@@ -94,31 +118,46 @@ class GUI:
             event: Tkinter event.
             widget: The tkinter widget to clone.
         """
-        cls = widget.__class__                                       # Class name.
-        cfg = {key: widget.cget(key) for key in widget.configure()}  # Configuration settings.
-        self.action_copy = cls(self.root, **cfg)
+        self.action_copy = self._get_clone_widget(widget, self.root)
         self.action_copy.pack()
 
         # Set starting position of the copy to the mouse position.
         self.on_drag_action(event, widget)
 
-    # TODO Look into CANVAS.
     def on_left_release_action(self, event: tk.Event) -> None:
         """Place action into design or delete.
         
-        If the mouse is within the Design frame, place the dragged action item into it.
+        If the mouse is within the Canvas, place the dragged action item into it.
         Otherwise, delete it.
 
         Args:
             event: Tkinter event.
         """
-        is_within = self.is_mouse_within_frame(self.design_fr, event.x_root, event.y_root)
+        is_within = self.is_mouse_within_frame(self.canvas, event.x_root, event.y_root)
         
         if is_within:
-            pass
-        else:
-            self.action_copy.destroy()
+            canvas_copy = self._get_clone_widget(self.action_copy, self.canvas_window)
+            canvas_copy.pack()
+
+        self.action_copy.destroy()
         self.action_copy = None
+
+    def _get_clone_widget(self, widget: tk.Widget, parent: tk.Widget) -> tk.Widget:
+        """Returns a clone of a widget.
+        
+        The widget's __class__ is used to create an instance of the widget using
+        attributes retrieved from the widget's cget function.
+
+        Args:
+            widget: The thing to clone.
+            parent: Set the widget's master variable to.
+
+        Returns:
+            A clone of the widget not connected through reference.
+        """
+        cls = widget.__class__                                       # Class name.
+        cfg = {key: widget.cget(key) for key in widget.configure()}  # Configuration settings.
+        return cls(parent, **cfg)
 
     def initialize(self, title: str) -> None:
         """Initializes the gui.
@@ -133,7 +172,6 @@ class GUI:
         """
         LABEL_FONT = 'Arial 14'
         SIZE_HEIGHT = 600
-        DESIGN_MIN_WIDTH = 600
         ACTION_MIN_WIDTH = 200
 
         root = tk.Tk()
@@ -159,37 +197,51 @@ class GUI:
         menu_bar.add_cascade(label='Edit', menu=edit_menu)
 
         # Container to hold Action and Design frames.
-        chart_fr = tk.Frame(root)
+        holder_fr = tk.Frame(root)
 
         # Actions has dragable options to do things with keyboard and/or mouse.
-        action_fr = tk.Frame(chart_fr, relief=tk.GROOVE, bd=2)
+        action_fr = tk.Frame(holder_fr, relief=tk.GROOVE, bd=2)
         action_label = tk.Label(action_fr, text='Actions', font=LABEL_FONT, relief=tk.RIDGE, bd=2)
         action_label.pack(fill=tk.X)
 
-        # TODO Add functionality to scrollbars.
         # Design holds actions and their configurations.
-        design_fr = tk.Frame(chart_fr, relief=tk.GROOVE, bd=2)
+        design_fr = tk.Frame(holder_fr, relief=tk.GROOVE, bd=2)
         design_label = tk.Label(design_fr, text='Design', font=LABEL_FONT, relief=tk.RIDGE, bd=2)
         design_label.pack(fill=tk.X)
-        design_scrollbar_vertical = tk.Scrollbar(design_fr)
-        design_scrollbar_vertical.pack(side=tk.RIGHT, fill=tk.Y)
-        design_scrollbar_horizontal = tk.Scrollbar(design_fr, orient=tk.HORIZONTAL)
-        design_scrollbar_horizontal.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Canvas where actions can be dragged to.
+        canvas = tk.Canvas(design_fr)
+
+        # TODO Implement or delete
+        # bbox = canvas.bbox('all')
+        # canvas.config(scrollregion=bbox)
+        canvas.create_rectangle(0,0,200,300,fill='red')
+
+        # This frame exists within the canvas, and is dragged with it.
+        canvas_window = tk.Frame()
+        canvas.create_window(100, 100, window=canvas_window, anchor=tk.N)
+        tk.Label(canvas_window, text="TEST").pack()
+
+        canvas.bind('<Button-1>', self.on_left_click_canvas)
+        canvas.bind('<B1-Motion>', self.on_drag_canvas)
+        canvas.pack(fill=tk.BOTH, expand=True)
 
         action_fr.grid(row=0, column=0, sticky='news')
         design_fr.grid(row=0, column=1, sticky='news')
 
         # Disallow action_fr from expanding horizontally when window resizes.
-        chart_fr.columnconfigure(0, weight=0, minsize=ACTION_MIN_WIDTH)
+        holder_fr.columnconfigure(0, weight=0, minsize=ACTION_MIN_WIDTH)
         # Allows resizing for design_fr both vertically and horizontally.
-        chart_fr.rowconfigure(0, weight=1, minsize=SIZE_HEIGHT)
-        chart_fr.columnconfigure(1, weight=1, min=DESIGN_MIN_WIDTH)
-        chart_fr.pack()
+        holder_fr.rowconfigure(0, weight=1, minsize=SIZE_HEIGHT)
+        holder_fr.columnconfigure(1, weight=1)
+        holder_fr.pack(fill=tk.BOTH, expand=True)
 
         root.config(menu=menu_bar)
 
         self.root = root
         self.menu_bar = menu_bar
-        self.chart_fr = chart_fr
+        self.holder_fr = holder_fr
         self.action_fr = action_fr
         self.design_fr = design_fr
+        self.canvas = canvas
+        self.canvas_window = canvas_window
