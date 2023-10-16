@@ -58,19 +58,17 @@ def on_drag_action(event: tk.Event, parent: tk.Widget, action_copy: tk.Widget, w
             action_copy: The tkinter widget that will be dragged.
             widget: The tkinter widget to grab height and width from.
         """
-        mouse_x, mouse_y = event.x_root, event.y_root
-        parent_x, parent_y = parent.winfo_rootx(), parent.winfo_rooty()
+        mouse_pos = (event.x_root, event.y_root)
+        parent_root_pos = (parent.winfo_rootx(), parent.winfo_rooty())
 
         if widget is None:
-            offset_x, offset_y = action_copy.winfo_width() // 2, action_copy.winfo_height() // 2
+            offset = (action_copy.winfo_width() // 2, action_copy.winfo_height() // 2)
         else:
             # Widget doesn't start with proper offset unless the original widget is passed.
             # Ex: Mouse position is lop-left of the widget instead of the middle.
-            offset_x, offset_y = widget.winfo_width() // 2, widget.winfo_height() // 2
+            offset = (widget.winfo_width() // 2, widget.winfo_height() // 2)
         
-        local_x = mouse_x - parent_x - offset_x
-        local_y = mouse_y - parent_y - offset_y
-
+        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
         action_copy.place(x=local_x, y=local_y)
 
 def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, action_copy: tk.Widget) -> None:
@@ -97,7 +95,7 @@ def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, 
         # Set starting position of the copy to the mouse position.
         on_drag_action(event, parent, action_copy, widget)
 
-def on_left_release_action(event: tk.Event, canvas: tk.Widget, canvas_window: tk.Widget, action_copy: tk.Widget) -> None:
+def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: list[tk.Frame], action_copy: tk.Widget) -> None:
     """Place action into design or delete.
     
     If the mouse is within the Canvas, place the dragged action item into it.
@@ -106,26 +104,42 @@ def on_left_release_action(event: tk.Event, canvas: tk.Widget, canvas_window: tk
     Args:
         event: Tkinter event.
         canvas: Tkinter canvas to check if mouse is hovering over.
-        canvas_window: The Tkinter frame that will be placed inside the canvas.
+        canvas_windows: Append a new canvas window to this list to keep track of actions.
         action_copy: Widget will be cloned and added to canvas_window.
     """
-    is_within = _is_mouse_within_frame(canvas, event.x_root, event.y_root)
+    is_within = _is_mouse_within_frame(canvas, (event.x_root, event.y_root))
     
     if is_within:
+        # TODO Look into tag_bind later on for arrows. #canvas.tag_bind('canvas_window', '<Enter>', lambda event: print(event))
+        # Create a canvas_window at the mouse position for each action dragged to canvas.
+        # This frame exists within the canvas, and is dragged with it.
+        canvas_window = tk.Frame()
+
+        mouse_pos = (event.x_root, event.y_root)
+        # canvasx and canvasy keeps the position correct when dragging throught the canvas.
+        parent_root_pos = (canvas.winfo_rootx() - canvas.canvasx(0),
+                           canvas.winfo_rooty() - canvas.canvasy(0))
+        offset = (0, 0)
+        
+        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
+        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', 
+                             width=action_copy.winfo_width(), height=action_copy.winfo_height())
+
+        # Drags the canvas window to where the mouse is positioned
+
         canvas_copy = _get_clone_widget(action_copy, canvas_window)
-        canvas_copy.grid()
+        canvas_copy.pack()
 
     action_copy.place_forget()
 
-def _is_mouse_within_frame(frame: tk.Widget, mouse_x: int, mouse_y: int) -> bool:
+def _is_mouse_within_frame(frame: tk.Widget, mouse_pos: (int, int)) -> bool:
     """Return is the mouse within the frame.
     
     If the mouse is within the given frame, return True, otherwise False.
 
     Args:
         frame: The frame to compare mouse position to.
-        mouse_x: The absolute x position of the mouse.
-        mouse_y: The absolute y position of the mouse.
+        mouse_pos: The absolute position of the mouse as a tuple (x, y).
 
     Returns:
         Boolean of whether the mouse is inside the frame or not.
@@ -138,8 +152,8 @@ def _is_mouse_within_frame(frame: tk.Widget, mouse_x: int, mouse_y: int) -> bool
     frame_bottom = frame_top + frame_height
     frame_right = frame_left + frame_width
 
-    if (mouse_x >= frame_left and mouse_x <= frame_right and 
-            mouse_y >= frame_top and mouse_y <= frame_bottom):
+    if (mouse_pos[0] >= frame_left and mouse_pos[0] <= frame_right and 
+            mouse_pos[1] >= frame_top and mouse_pos[1] <= frame_bottom):
         return True
     return False
 
@@ -161,3 +175,8 @@ def _get_clone_widget(widget: tk.Widget, parent: tk.Widget) -> tk.Widget:
     cls = widget.__class__                                       # Class name.
     cfg = {key: widget.cget(key) for key in widget.configure()}  # Configuration settings.
     return cls(parent, **cfg)
+
+def _get_local_position(mouse_pos: (int, int), parent_root_pos: (int, int), offset: (int, int)) -> (int, int):
+     local_x = mouse_pos[0] - parent_root_pos[0] - offset[0]
+     local_y = mouse_pos[1] - parent_root_pos[1] - offset[1]
+     return (local_x, local_y)

@@ -12,7 +12,7 @@ class GUI:
     action_fr: tk.Frame = ...
     design_fr: tk.Frame = ...
     canvas: tk.Canvas = ...
-    canvas_window: tk.Frame = ...
+    canvas_windows: list[tk.Frame] = ...
     canvas_zoom = [0]
     action_copy : tk.Widget = ...
     
@@ -41,7 +41,7 @@ class GUI:
         click_item.bind('<Button-1>', 
                         lambda event: events.on_left_click_action(event, click_item, self.root, self.action_copy))
         click_item.bind('<ButtonRelease-1>', 
-                        lambda event: events.on_left_release_action(event, self.canvas, self.canvas_window, self.action_copy))
+                        lambda event: events.on_left_release_action(event, self.canvas, self.canvas_windows, self.action_copy))
         click_item.pack()
 
     def initialize(self, title: str) -> None:
@@ -116,12 +116,6 @@ class GUI:
             y_end = GRID_HEIGHT
             canvas.create_line(x_pos, y_start, x_pos, y_end, fill='black', width=1)
 
-        # This frame exists within the canvas, and is dragged with it.
-        # TODO Look into tag_bind later on for arrows. #canvas.tag_bind('canvas_window', '<Enter>', lambda event: print(event))
-        canvas_window = tk.Frame(bg='black', width=100, height=100)
-        tk.Label(canvas_window, text="TEST").grid(row=0, column=0, sticky='news')
-        canvas.create_window(100, 100, window=canvas_window, tags='canvas_window')
-
         # Bind user actions to canvas.
         canvas.bind('<Button-1>', lambda event: events.on_left_click_canvas(event, self.canvas))
         canvas.bind('<B1-Motion>', lambda event: events.on_drag_canvas(event, self.canvas))
@@ -146,4 +140,4 @@ class GUI:
         self.action_fr = action_fr
         self.design_fr = design_fr
         self.canvas = canvas
-        self.canvas_window = canvas_window
+        self.canvas_windows = []
