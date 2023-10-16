@@ -2,7 +2,7 @@ import tkinter as tk
 import pyautogui
 from pynput.mouse import Button, Controller
 
-from gui import GUI
+from gui.gui import GUI
 from action import Action
 
 APP_NAME = "John Ly's Auto Clicker"
