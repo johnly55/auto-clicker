@@ -55,7 +55,7 @@ class GUI:
         Args:
             title: The window title.
         """
-        LABEL_FONT = 'Arial 14'
+        LABEL_FONT = ('Arial', 14)
         SIZE_HEIGHT = 600
         ACTION_MIN_WIDTH = 200
 
@@ -119,7 +119,9 @@ class GUI:
         # Bind user actions to canvas.
         canvas.bind('<Button-1>', lambda event: events.on_left_click_canvas(event, self.canvas))
         canvas.bind('<B1-Motion>', lambda event: events.on_drag_canvas(event, self.canvas))
-        canvas.bind('<MouseWheel>', lambda event: events.on_mouse_scroll_canvas(event, self.canvas, self.canvas_zoom))
+        canvas.bind('<MouseWheel>', 
+                    lambda event: events.on_mouse_scroll_canvas(event, self.canvas, self.canvas_zoom, self.canvas_windows, LABEL_FONT))
+        
         canvas.pack(fill=tk.BOTH, expand=True)
 
         action_fr.grid(row=0, column=0, sticky='news')
