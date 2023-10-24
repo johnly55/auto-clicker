@@ -4,6 +4,7 @@ from . import events
 from action import Action
 
 
+# TODO Remove unnecessary
 class GUI:
     """Graphical user interface."""
     root: tk.Tk = ...
@@ -108,17 +109,17 @@ class GUI:
             x_start = 0
             x_end = GRID_WIDTH
             y_pos = GRID_HEIGHT / LINES_PER_GRID * i
-            canvas.create_line(x_start, y_pos, x_end, y_pos, fill='black', width=1)
+            canvas.create_line(x_start, y_pos, x_end, y_pos, fill='black', width=1, tags='grid')
 
             # Vertical Lines.
             x_pos = GRID_WIDTH / LINES_PER_GRID * i
             y_start = 0
             y_end = GRID_HEIGHT
-            canvas.create_line(x_pos, y_start, x_pos, y_end, fill='black', width=1)
+            canvas.create_line(x_pos, y_start, x_pos, y_end, fill='black', width=1, tags='grid')
 
         # Bind user actions to canvas.
-        canvas.bind('<Button-1>', lambda event: events.on_left_click_canvas(event, self.canvas))
-        canvas.bind('<B1-Motion>', lambda event: events.on_drag_canvas(event, self.canvas))
+        canvas.bind('<Button-1>', lambda event: canvas.scan_mark(event.x, event.y))
+        canvas.bind('<B1-Motion>', lambda event: canvas.scan_dragto(event.x, event.y, gain=1))
         canvas.bind('<MouseWheel>', 
                     lambda event: events.on_mouse_scroll_canvas(event, self.canvas, self.canvas_zoom, self.canvas_windows, LABEL_FONT))
         

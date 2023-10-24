@@ -1,36 +1,14 @@
 import tkinter as tk
 
 
-def on_left_click_canvas(event: tk.Event, canvas: tk.Canvas) -> None:
-    """Canvas saves mouse position.
-    
-    This function saves the mouse's position to be later used with
-    the scan_dragto function.
-    
-    Args:
-        event: Tkinter event.
-        canvas: Tkinter canvas to scan and drag through.
-    """
-    canvas.scan_mark(event.x, event.y)
-
-def on_drag_canvas(event: tk.Event, canvas: tk.Canvas) -> None:
-        """Drag canvas when mouse moves.
-        
-        Using the mouse position saved with scan_mark, simulate
-        the canvas being dragged around with the scan_dragto function.
-        
-        Args:
-            event: Tkinter event.
-            canvas: Tkinter canvas to scan and drag through.
-        """
-        canvas.scan_dragto(event.x, event.y, gain=1)
-
-ZOOM_LIMIT = 5
+ZOOM_LIMIT = 8
+ZOOM_SPEED = 0.06
+# TODO FIX and set border region
 def on_mouse_scroll_canvas(event: tk.Event, canvas: tk.Canvas, canvas_zoom: list, 
                            canvas_windows: list[tk.Frame], font: (str, int)) -> None:
     """Zooms in/out the canvas.
     
-    Depending on which way the mouse wheel scrolls, zoom in
+    Depending on which way the mouse wheel scrolls (delta), zoom in
     or out a certain amount before hitting a limit.
     Also, slightly increase/decrease of font size of actions in canvas.
 
@@ -41,40 +19,25 @@ def on_mouse_scroll_canvas(event: tk.Event, canvas: tk.Canvas, canvas_zoom: list
         canvas_windows: List of canvas windows, each containing an action.
         font: The default font of the action to change size of.
     """
-    gain = 0.06  # Speed of zoom.
-    did_zoom = False
-    if event.delta > 0:
-        if canvas_zoom[0] < ZOOM_LIMIT:
-            canvas_zoom[0] += 1
-            scale = 1 + gain
-            canvas.scale('all', 0, 0, scale, scale)
-            did_zoom = True
-    else:
-        if canvas_zoom[0] > -ZOOM_LIMIT:
-            canvas_zoom[0] -= 1
-            scale = 1 / (1 + gain)
-            canvas.scale('all', 0, 0, scale, scale)
-            did_zoom = True
+    scale = 1
+    if event.delta > 0 and canvas_zoom[0] < ZOOM_LIMIT:
+        canvas_zoom[0] += 1
+        scale = 1 + ZOOM_SPEED
+        canvas.scale('grid', 0, 0, scale, scale)
 
-    if did_zoom:
-        return
-        # TODO Redraw the window to fit font size
-        # If we zoomed in or out, adjust the font size accordingly.
-        for canvas_window in canvas_windows:
-                action = canvas_window.winfo_children()[0]
-                font = (font[0], font[1] + canvas_zoom[0])
-                action.config(font=font)
-                width = action.cget('width')
-                height = action.cget('height')
-                # Resize and redraw.
-                canvas_window.config(width=width, height=height)
-                x = (canvas_window.winfo_x() - canvas.canvasx(0))
-                y = (canvas_window.winfo_y() - canvas.canvasy(0))
-                local_x = x
-                local_y = y
-                canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', 
-                             width=width, height=height)
+    elif event.delta < 0 and canvas_zoom[0] > -ZOOM_LIMIT:
+        canvas_zoom[0] -= 1
+        # Calculation so scaling out is porportionate to scaling in.
+        scale = 1 / (1 + ZOOM_SPEED)
+        canvas.scale('grid', 0, 0, scale, scale)
 
+    font = (font[0], font[1] + canvas_zoom[0])
+    for canvas_window in canvas_windows:
+        action = canvas_window.winfo_children()[0]
+        action.config(font=font)
+        local_x = canvas_window.winfo_x() + canvas.canvasx(0)
+        local_y = canvas_window.winfo_y() + canvas.canvasy(0)    
+        canvas.create_window(local_x*scale, local_y*scale, window=canvas_window, anchor='nw')
 
 def on_drag_action(event: tk.Event, parent: tk.Widget, drag_widget: tk.Widget, reference_widget: tk.Widget=None) -> None:
         """Drags copy of a widget to the mouse position.
@@ -104,8 +67,8 @@ def on_drag_action(event: tk.Event, parent: tk.Widget, drag_widget: tk.Widget, r
 def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, action_copy: tk.Widget) -> None:
         """Create a copy of an action.
         
-        Take a widget and create a copy of that, then drag it to where the mouse is.
-        Copy the text, height, and width.
+        Take a widget and create a copy of that by copying the text, height, and width.
+        Then drag it to where the mouse is.
 
         Args:
             event: Tkinter event.
@@ -113,7 +76,6 @@ def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, 
             parent: Tkinter frame where the action_copy will be copied to.
             action_copy: Will copy the selected widget and move to the mouse.
         """
-        # Copy size and text of the widget.
         action_copy.configure(
              text=widget.cget('text'),
              width=widget.cget('width'),
@@ -121,14 +83,14 @@ def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, 
              )
         action_copy.grid()
 
-        # Set starting position of the copy to the mouse position.
         on_drag_action(event, parent, action_copy, widget)
 
 def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: list[tk.Frame], action_copy: tk.Widget) -> None:
     """Place copy of action in canvas if hovering over it.
     
-    If the mouse is within the Canvas, create a canvas_window and 
-    copy the dragged action item into it. Otherwise, delete it.
+    If the mouse is within the Canvas, create a canvas_window,
+    copy the dragged action item into it, and bind actions.
+    Otherwise, delete it.
 
     Args:
         event: Tkinter event.
@@ -148,18 +110,17 @@ def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: l
         # canvasx and canvasy helps keep the position correct when dragging throught the canvas.
         parent_root_pos = (canvas.winfo_rootx() - canvas.canvasx(0),
                            canvas.winfo_rooty() - canvas.canvasy(0))
-        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos)
-        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', 
+        offset = (action_copy.winfo_width() // 2, action_copy.winfo_height() // 2)
+        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
+        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw', 
                              width=action_copy.winfo_width(), height=action_copy.winfo_height())
 
-        # Copy and pack the action into this canvas_window.
         canvas_copy = _get_clone_widget(action_copy, canvas_window)
         canvas_copy.bind('<B1-Motion>', lambda event: on_drag_action(event, canvas, canvas_window))
         canvas_copy.bind('<ButtonRelease-1>', lambda event: on_release_action_in_canvas(event, canvas, canvas_window))
-        canvas_copy.pack()
         canvas_windows.append(canvas_window)
+        canvas_copy.pack()
 
-    # Make the action_copy invisible when not in use.
     action_copy.place_forget()
 
 def on_release_action_in_canvas(event: tk.Event, canvas: tk.Widget, canvas_window: tk.Widget) -> None:
@@ -167,19 +128,20 @@ def on_release_action_in_canvas(event: tk.Event, canvas: tk.Widget, canvas_windo
         
         Redraw the canvas_window in the canvas when it stops being dragged.
         This provides a cleaner animation than placing on drag.
+        The canvasx() and canvasy() functions track the middle of the canvas as
+        the user drags the canvas around.
 
         Args:
             event: Tkinter event.
             canvas: Used as a position reference.
             canvas_window: The tkinter widget that will be dragged.
         """
-        # The place() and create_window() functions work differently in the canvas.
         mouse_pos = (event.x_root, event.y_root)
-        # canvasx and canvasy helps keep the position correct when dragging throught the canvas.
         parent_root_pos = (canvas.winfo_rootx() - canvas.canvasx(0),
                            canvas.winfo_rooty() - canvas.canvasy(0))
-        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos)
-        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', 
+        offset = (canvas_window.winfo_width() // 2, canvas_window.winfo_height() // 2)
+        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
+        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw', 
                              width=canvas_window.winfo_width(), height=canvas_window.winfo_height())
 
 def _is_mouse_within_frame(frame: tk.Widget, mouse_pos: (int, int)) -> bool:
@@ -207,8 +169,6 @@ def _is_mouse_within_frame(frame: tk.Widget, mouse_pos: (int, int)) -> bool:
         return True
     return False
 
-
-
 def _get_clone_widget(widget: tk.Widget, parent: tk.Widget) -> tk.Widget:
     """Returns a clone of a widget.
     
@@ -222,9 +182,9 @@ def _get_clone_widget(widget: tk.Widget, parent: tk.Widget) -> tk.Widget:
     Returns:
         A clone of the widget not connected through reference.
     """
-    cls = widget.__class__                                       # Class name.
-    cfg = {key: widget.cget(key) for key in widget.configure()}  # Configuration settings.
-    return cls(parent, **cfg)
+    class_name = widget.__class__
+    configurations = {key: widget.cget(key) for key in widget.configure()}
+    return class_name(parent, **configurations)
 
 def _get_local_position(mouse_pos: (int, int), parent_root_pos: (int, int), offset: (int, int)=(0, 0)) -> (int, int):
      """Returns the local position of the mouse.
