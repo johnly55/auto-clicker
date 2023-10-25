@@ -1,10 +1,11 @@
+"""TODO"""
 import tkinter as tk
 
-from . import events
 from action import Action
+from . import events
 
 
-# TODO Remove unnecessary
+# TODO Remove unnecessary comments split init into different functions for simplicity.
 class GUI:
     """Graphical user interface."""
     root: tk.Tk = ...
@@ -16,13 +17,14 @@ class GUI:
     canvas_windows: list[tk.Frame] = ...
     canvas_zoom = [0]
     action_copy : tk.Widget = ...
-    
+
     def __init__(self, title: str=None) -> None:
         """Initializes gui with a title."""
         title = title if title is not None else ""
         self.initialize(title)
         self.add_preset_actions()
-
+    
+    ACTION_FONT = ('Arial', 12)
     def add_preset_actions(self) -> None:
         """Add action options to the Action frame.
         
@@ -35,16 +37,19 @@ class GUI:
 
         # Add click action.
         click_action = Action(Action.ActionType.CLICK)
-        click_item = tk.Button(self.action_fr, text=click_action.action_name.upper(), relief=tk.RAISED, bd=1)
+        click_item = tk.Button(self.action_fr, text=click_action.action_name.upper(), relief=tk.RAISED, bd=1, font=self.ACTION_FONT)
 
-        click_item.bind('<B1-Motion>', 
+        click_item.bind('<B1-Motion>',
                         lambda event: events.on_drag_action(event, self.root, self.action_copy))
-        click_item.bind('<Button-1>', 
-                        lambda event: events.on_left_click_action(event, click_item, self.root, self.action_copy))
-        click_item.bind('<ButtonRelease-1>', 
+        click_item.bind('<Button-1>',
+                        lambda event: events.on_left_click_action(event, click_item, self.root, self.action_copy, self.canvas_zoom))
+        click_item.bind('<ButtonRelease-1>',
                         lambda event: events.on_left_release_action(event, self.canvas, self.canvas_windows, self.action_copy))
         click_item.pack()
 
+    LABEL_FONT = ('Arial', 14)
+    SIZE_HEIGHT = 600
+    ACTION_MIN_WIDTH = 200
     def initialize(self, title: str) -> None:
         """Initializes the gui.
 
@@ -56,10 +61,6 @@ class GUI:
         Args:
             title: The window title.
         """
-        LABEL_FONT = ('Arial', 14)
-        SIZE_HEIGHT = 600
-        ACTION_MIN_WIDTH = 200
-
         root = tk.Tk()
         root.title(title)
 
@@ -87,41 +88,25 @@ class GUI:
 
         # Actions has dragable options to do things with keyboard and/or mouse.
         action_fr = tk.Frame(holder_fr, relief=tk.GROOVE, bd=2)
-        action_label = tk.Label(action_fr, text='Actions', font=LABEL_FONT, relief=tk.RIDGE, bd=2)
+        action_label = tk.Label(action_fr, text='Actions', font=self.LABEL_FONT, relief=tk.RIDGE, bd=2)
         action_label.pack(fill=tk.X)
 
         # Design holds actions and their configurations.
         design_fr = tk.Frame(holder_fr, relief=tk.GROOVE, bd=2)
-        design_label = tk.Label(design_fr, text='Design', font=LABEL_FONT, relief=tk.RIDGE, bd=2)
+        design_label = tk.Label(design_fr, text='Design', font=self.LABEL_FONT, relief=tk.RIDGE, bd=2)
         design_label.pack(fill=tk.X)
 
         # Canvas where actions can be dragged to.
         canvas = tk.Canvas(design_fr)
         
-        # TODO Expand grid as user scrolls
-        # Draw a grid
-        GRID_WIDTH = 500
-        GRID_HEIGHT = 500
-        LINES_PER_GRID = 10
-
-        for i in range(LINES_PER_GRID):
-            # Horizontal Lines.
-            x_start = 0
-            x_end = GRID_WIDTH
-            y_pos = GRID_HEIGHT / LINES_PER_GRID * i
-            canvas.create_line(x_start, y_pos, x_end, y_pos, fill='black', width=1, tags='grid')
-
-            # Vertical Lines.
-            x_pos = GRID_WIDTH / LINES_PER_GRID * i
-            y_start = 0
-            y_end = GRID_HEIGHT
-            canvas.create_line(x_pos, y_start, x_pos, y_end, fill='black', width=1, tags='grid')
+        self.draw_grid(canvas)
+        canvas.config(scrollregion=canvas.bbox('grid'))
 
         # Bind user actions to canvas.
         canvas.bind('<Button-1>', lambda event: canvas.scan_mark(event.x, event.y))
         canvas.bind('<B1-Motion>', lambda event: canvas.scan_dragto(event.x, event.y, gain=1))
-        canvas.bind('<MouseWheel>', 
-                    lambda event: events.on_mouse_scroll_canvas(event, self.canvas, self.canvas_zoom, self.canvas_windows, LABEL_FONT))
+        canvas.bind('<MouseWheel>',
+                    lambda event: events.on_mouse_scroll_canvas(event, self.canvas, self.canvas_zoom, self.canvas_windows, self.ACTION_FONT))
         
         canvas.pack(fill=tk.BOTH, expand=True)
 
@@ -129,9 +114,9 @@ class GUI:
         design_fr.grid(row=0, column=1, sticky='news')
 
         # Disallow action_fr from expanding horizontally when window resizes.
-        holder_fr.columnconfigure(0, weight=0, minsize=ACTION_MIN_WIDTH)
+        holder_fr.columnconfigure(0, weight=0, minsize=self.ACTION_MIN_WIDTH)
         # Allows resizing for design_fr both vertically and horizontally.
-        holder_fr.rowconfigure(0, weight=1, minsize=SIZE_HEIGHT)
+        holder_fr.rowconfigure(0, weight=1, minsize=self.SIZE_HEIGHT)
         holder_fr.columnconfigure(1, weight=1)
         holder_fr.pack(fill=tk.BOTH, expand=True)
 
@@ -144,3 +129,27 @@ class GUI:
         self.design_fr = design_fr
         self.canvas = canvas
         self.canvas_windows = []
+
+    GRID_WIDTH = 500
+    GRID_HEIGHT = 500
+    LINES_PER_GRID = 10
+    NUM_GRIDS_HORIZONTAL = 4
+    NUM_GRIDS_VERTICAL = 4
+    def draw_grid(self, canvas: tk.Canvas):
+        """TODO"""
+        for grid_horizontal in range(self.NUM_GRIDS_HORIZONTAL):
+            grid_horizontal -= self.NUM_GRIDS_HORIZONTAL // 2
+            for grid_vertical in range(self.NUM_GRIDS_VERTICAL):
+                grid_vertical -= self.NUM_GRIDS_VERTICAL // 2
+                for i in range(self.LINES_PER_GRID):
+                    # Horizontal Lines.
+                    x_start = grid_horizontal * self.GRID_WIDTH
+                    x_end = x_start + self.GRID_WIDTH
+                    y_pos = (self.GRID_HEIGHT / self.LINES_PER_GRID * i) + grid_vertical * self.GRID_HEIGHT
+                    canvas.create_line(x_start, y_pos, x_end, y_pos, fill='black', width=1, tags='grid')
+
+                    # Vertical Lines.
+                    x_pos = (self.GRID_WIDTH / self.LINES_PER_GRID * i) + grid_horizontal * self.GRID_WIDTH
+                    y_start = grid_vertical * self.GRID_HEIGHT
+                    y_end = y_start + self.GRID_HEIGHT
+                    canvas.create_line(x_pos, y_start, x_pos, y_end, fill='black', width=1, tags='grid')

@@ -1,16 +1,21 @@
+"""TODO Module docstring"""
 import tkinter as tk
 
-
-ZOOM_LIMIT = 8
+ZOOM_LIMIT = 5
 ZOOM_SPEED = 0.06
-# TODO FIX and set border region
-def on_mouse_scroll_canvas(event: tk.Event, canvas: tk.Canvas, canvas_zoom: list, 
-                           canvas_windows: list[tk.Frame], font: (str, int)) -> None:
+def on_mouse_scroll_canvas(
+          event: tk.Event,
+          canvas: tk.Canvas,
+          canvas_zoom: list,
+          canvas_windows: list[tk.Frame],
+          font: tuple[str, int]
+          ) -> None:
     """Zooms in/out the canvas.
     
     Depending on which way the mouse wheel scrolls (delta), zoom in
     or out a certain amount before hitting a limit.
-    Also, slightly increase/decrease of font size of actions in canvas.
+    Slightly increase/decrease of font size of actions in canvas.
+    Then, resets the canvas' scrollregion.
 
     Args:
         event: Tkinter event.
@@ -34,10 +39,11 @@ def on_mouse_scroll_canvas(event: tk.Event, canvas: tk.Canvas, canvas_zoom: list
     font = (font[0], font[1] + canvas_zoom[0])
     for canvas_window in canvas_windows:
         action = canvas_window.winfo_children()[0]
-        action.config(font=font)
+        _set_font_size(action, font=font)
         local_x = canvas_window.winfo_x() + canvas.canvasx(0)
-        local_y = canvas_window.winfo_y() + canvas.canvasy(0)    
+        local_y = canvas_window.winfo_y() + canvas.canvasy(0)
         canvas.create_window(local_x*scale, local_y*scale, window=canvas_window, anchor='nw')
+    canvas.config(scrollregion=canvas.bbox('grid'))
 
 def on_drag_action(event: tk.Event, parent: tk.Widget, drag_widget: tk.Widget, reference_widget: tk.Widget=None) -> None:
         """Drags copy of a widget to the mouse position.
@@ -64,26 +70,27 @@ def on_drag_action(event: tk.Event, parent: tk.Widget, drag_widget: tk.Widget, r
         local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
         drag_widget.place(x=local_x, y=local_y)
 
-def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, action_copy: tk.Widget) -> None:
-        """Create a copy of an action.
-        
-        Take a widget and create a copy of that by copying the text, height, and width.
-        Then drag it to where the mouse is.
+def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, action_copy: tk.Widget, canvas_zoom: list[int]) -> None:
+    """Create a copy of an action.
+    
+    Take a widget and copy its features to the action_copy widget.
+    Then drag it to where the mouse is.
 
-        Args:
-            event: Tkinter event.
-            widget: The tkinter widget to clone.
-            parent: Tkinter frame where the action_copy will be copied to.
-            action_copy: Will copy the selected widget and move to the mouse.
-        """
-        action_copy.configure(
-             text=widget.cget('text'),
-             width=widget.cget('width'),
-             height=widget.cget('height')
-             )
-        action_copy.grid()
-
-        on_drag_action(event, parent, action_copy, widget)
+    Args:
+        event: Tkinter event.
+        widget: The tkinter widget to clone.
+        parent: Tkinter frame where the action_copy will be copied to.
+        action_copy: Will copy the selected widget and move to the mouse.
+    """
+    action_copy.configure(
+            text=widget.cget('text'),
+            width=widget.cget('width'),
+            height=widget.cget('height'),
+            font=widget.cget('font')
+            )
+    _set_font_size(action_copy, add_size=canvas_zoom[0])
+    action_copy.grid()
+    on_drag_action(event, parent, action_copy, widget)
 
 def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: list[tk.Frame], action_copy: tk.Widget) -> None:
     """Place copy of action in canvas if hovering over it.
@@ -112,14 +119,14 @@ def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: l
                            canvas.winfo_rooty() - canvas.canvasy(0))
         offset = (action_copy.winfo_width() // 2, action_copy.winfo_height() // 2)
         local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
-        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw', 
+        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw',
                              width=action_copy.winfo_width(), height=action_copy.winfo_height())
 
-        canvas_copy = _get_clone_widget(action_copy, canvas_window)
-        canvas_copy.bind('<B1-Motion>', lambda event: on_drag_action(event, canvas, canvas_window))
-        canvas_copy.bind('<ButtonRelease-1>', lambda event: on_release_action_in_canvas(event, canvas, canvas_window))
+        action = _get_clone_widget(action_copy, canvas_window)
+        action.bind('<B1-Motion>', lambda event: on_drag_action(event, canvas, canvas_window))
+        action.bind('<ButtonRelease-1>', lambda event: on_release_action_in_canvas(event, canvas, canvas_window))
         canvas_windows.append(canvas_window)
-        canvas_copy.pack()
+        action.pack()
 
     action_copy.place_forget()
 
@@ -203,3 +210,15 @@ def _get_local_position(mouse_pos: (int, int), parent_root_pos: (int, int), offs
      local_x = mouse_pos[0] - parent_root_pos[0] - offset[0]
      local_y = mouse_pos[1] - parent_root_pos[1] - offset[1]
      return (local_x, local_y)
+
+def _set_font_size(widget: tk.Widget, font: tuple[str, int]=None, set_size: int=0, add_size: int=0):
+    """TODO"""
+    if font:
+        widget.config(font=font)
+    else:
+        font = widget.cget('font').split()
+        font[1] = int(font[1])
+        if set_size != 0:
+            font[1] = set_size
+        font[1] += add_size
+        widget.config(font=font)
