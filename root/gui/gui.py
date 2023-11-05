@@ -5,6 +5,7 @@ from action import Action
 from . import events
 
 
+# TODO Open up a config window for actions.
 # TODO Remove unnecessary comments split init into different functions for simplicity.
 class GUI:
     """Graphical user interface."""
