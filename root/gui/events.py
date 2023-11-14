@@ -1,4 +1,18 @@
-"""TODO Module docstring"""
+"""Provides events and helper functions for GUI.
+
+Requires tkinter to be installed.
+
+Includes functions:
+    on_mouse_scroll_canvas - Deals with zooming in/out the canvas. 
+    on_drag_action - Deals with dragging an action.
+    on_left_click_action - Deals with left clicking on an action.
+    on_left_release_action - Deals with releasing the left click on an action.
+    on_release_action_in_canvas - Deals with releasing an action already in the canvas.
+    _is_mouse_within_frame - Checks if the mouse is within a frame.
+    _get_clone_widget - Creates and returns a copy of a widget with its attributes.
+    _get_local_position - Get the local mouse position within a frame.
+    _set_font_size - Set the font, or just the size, or add to the size.
+"""
 import tkinter as tk
 
 ZOOM_LIMIT = 5
@@ -45,32 +59,43 @@ def on_mouse_scroll_canvas(
         canvas.create_window(local_x*scale, local_y*scale, window=canvas_window, anchor='nw')
     canvas.config(scrollregion=canvas.bbox('grid'))
 
-def on_drag_action(event: tk.Event, parent: tk.Widget, drag_widget: tk.Widget, reference_widget: tk.Widget=None) -> None:
-        """Drags copy of a widget to the mouse position.
-        
-        The widget is dragged to the mouse position based on the parent's relative
-        position, the mouse position, and an offset.
+def on_drag_action(
+        event: tk.Event,
+        parent: tk.Widget,
+        drag_widget: tk.Widget,
+        reference_widget: tk.Widget=None
+        ) -> None:
+    """Drags copy of a widget to the mouse position.
+    
+    The widget is dragged to the mouse position based on the parent's relative
+    position, the mouse position, and an offset.
 
-        Args:
-            event: Tkinter event.
-            parent: Used as a position reference.
-            drag_widget: The tkinter widget that will be dragged.
-            reference_widget: The tkinter widget to grab height and width from to set offset.
-        """
-        mouse_pos = (event.x_root, event.y_root)
-        parent_root_pos = (parent.winfo_rootx(), parent.winfo_rooty())
+    Args:
+        event: Tkinter event.
+        parent: Used as a position reference.
+        drag_widget: The tkinter widget that will be dragged.
+        reference_widget: The tkinter widget to grab height and width from to set offset.
+    """
+    mouse_pos = (event.x_root, event.y_root)
+    parent_root_pos = (parent.winfo_rootx(), parent.winfo_rooty())
 
-        if reference_widget is None:
-            offset = (drag_widget.winfo_width() // 2, drag_widget.winfo_height() // 2)
-        else:
-            # Widget doesn't start with proper offset unless the original widget is passed.
-            # Ex: Mouse position is lop-left of the widget instead of the middle.
-            offset = (reference_widget.winfo_width() // 2, reference_widget.winfo_height() // 2)
-        
-        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
-        drag_widget.place(x=local_x, y=local_y)
+    if reference_widget is None:
+        offset = (drag_widget.winfo_width() // 2, drag_widget.winfo_height() // 2)
+    else:
+        # Widget doesn't start with proper offset unless the original widget is passed.
+        # Ex: Mouse position is lop-left of the widget instead of the middle.
+        offset = (reference_widget.winfo_width() // 2, reference_widget.winfo_height() // 2)
 
-def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, action_copy: tk.Widget, canvas_zoom: list[int]) -> None:
+    local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
+    drag_widget.place(x=local_x, y=local_y)
+
+def on_left_click_action(
+        event: tk.Event,
+        widget: tk.Widget,
+        parent: tk.Widget,
+        action_copy: tk.Widget,
+        canvas_zoom: list[int]
+        ) -> None:
     """Create a copy of an action.
     
     Take a widget and copy its features to the action_copy widget.
@@ -92,7 +117,12 @@ def on_left_click_action(event: tk.Event, widget: tk.Widget, parent: tk.Widget, 
     action_copy.grid()
     on_drag_action(event, parent, action_copy, widget)
 
-def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: list[tk.Frame], action_copy: tk.Widget) -> None:
+def on_left_release_action(
+        event: tk.Event,
+        canvas: tk.Canvas,
+        canvas_windows: list[tk.Frame],
+        action_copy: tk.Widget
+        ) -> None:
     """Place copy of action in canvas if hovering over it.
     
     If the mouse is within the Canvas, create a canvas_window,
@@ -106,11 +136,9 @@ def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: l
         action_copy: Widget will be cloned and added to canvas_window.
     """
     is_within = _is_mouse_within_frame(canvas, (event.x_root, event.y_root))
-    
+
     if is_within:
         # TODO Look into tag_bind later on for arrows. #canvas.tag_bind('canvas_window', '<Enter>', lambda event: print(event))
-        # Create a canvas_window at the mouse position for each action dragged to canvas.
-        # This frame exists within the canvas, and is dragged with it.
         canvas_window = tk.Frame(canvas)
 
         mouse_pos = (event.x_root, event.y_root)
@@ -119,37 +147,43 @@ def on_left_release_action(event: tk.Event, canvas: tk.Canvas, canvas_windows: l
                            canvas.winfo_rooty() - canvas.canvasy(0))
         offset = (action_copy.winfo_width() // 2, action_copy.winfo_height() // 2)
         local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
-        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw',
+        canvas.create_window(local_x, local_y, window=canvas_window,
+                             tags='canvas_window', anchor='nw',
                              width=action_copy.winfo_width(), height=action_copy.winfo_height())
 
         action = _get_clone_widget(action_copy, canvas_window)
         action.bind('<B1-Motion>', lambda event: on_drag_action(event, canvas, canvas_window))
-        action.bind('<ButtonRelease-1>', lambda event: on_release_action_in_canvas(event, canvas, canvas_window))
+        action.bind('<ButtonRelease-1>',
+                    lambda event: on_release_action_in_canvas(event, canvas, canvas_window))
         canvas_windows.append(canvas_window)
         action.pack()
 
     action_copy.place_forget()
 
-def on_release_action_in_canvas(event: tk.Event, canvas: tk.Widget, canvas_window: tk.Widget) -> None:
-        """Redraws the action on the canvas.
-        
-        Redraw the canvas_window in the canvas when it stops being dragged.
-        This provides a cleaner animation than placing on drag.
-        The canvasx() and canvasy() functions track the middle of the canvas as
-        the user drags the canvas around.
+def on_release_action_in_canvas(
+        event: tk.Event,
+        canvas: tk.Widget,
+        canvas_window: tk.Widget
+        ) -> None:
+    """Redraws the action on the canvas.
+    
+    Redraw the canvas_window in the canvas when it stops being dragged.
+    This provides a cleaner animation than placing on drag.
+    The canvasx() and canvasy() functions track the middle of the canvas as
+    the user drags the canvas around.
 
-        Args:
-            event: Tkinter event.
-            canvas: Used as a position reference.
-            canvas_window: The tkinter widget that will be dragged.
-        """
-        mouse_pos = (event.x_root, event.y_root)
-        parent_root_pos = (canvas.winfo_rootx() - canvas.canvasx(0),
-                           canvas.winfo_rooty() - canvas.canvasy(0))
-        offset = (canvas_window.winfo_width() // 2, canvas_window.winfo_height() // 2)
-        local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
-        canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw', 
-                             width=canvas_window.winfo_width(), height=canvas_window.winfo_height())
+    Args:
+        event: Tkinter event.
+        canvas: Used as a position reference.
+        canvas_window: The tkinter widget that will be dragged.
+    """
+    mouse_pos = (event.x_root, event.y_root)
+    parent_root_pos = (canvas.winfo_rootx() - canvas.canvasx(0),
+                        canvas.winfo_rooty() - canvas.canvasy(0))
+    offset = (canvas_window.winfo_width() // 2, canvas_window.winfo_height() // 2)
+    local_x, local_y = _get_local_position(mouse_pos, parent_root_pos, offset)
+    canvas.create_window(local_x, local_y, window=canvas_window, tags='canvas_window', anchor='nw',
+                            width=canvas_window.winfo_width(), height=canvas_window.winfo_height())
 
 def _is_mouse_within_frame(frame: tk.Widget, mouse_pos: (int, int)) -> bool:
     """Return is the mouse within the frame.
@@ -193,26 +227,37 @@ def _get_clone_widget(widget: tk.Widget, parent: tk.Widget) -> tk.Widget:
     configurations = {key: widget.cget(key) for key in widget.configure()}
     return class_name(parent, **configurations)
 
-def _get_local_position(mouse_pos: (int, int), parent_root_pos: (int, int), offset: (int, int)=(0, 0)) -> (int, int):
-     """Returns the local position of the mouse.
-     
-     Calculate the relative position of the mouse in the parent window using the mouse position,
-     the root position of the parent window, and a offset.
+def _get_local_position(
+        mouse_pos: (int, int),
+        parent_root_pos: (int, int),
+        offset: (int, int)=(0, 0)
+        ) -> (int, int):
+    """Returns the local position of the mouse.
+    
+    Calculate the relative position of the mouse in the parent window using the mouse position,
+    the root position of the parent window, and a offset.
 
-     Args:
-        mouse_pos: Tuple containing the x and y position of the mouse.
-        parent_root_pos: Tuple containing the x and y position of the top-left window.
-        offset: Tuple to offset the local x and y position.
+    Args:
+    mouse_pos: Tuple containing the x and y position of the mouse.
+    parent_root_pos: Tuple containing the x and y position of the top-left window.
+    offset: Tuple to offset the local x and y position.
 
     Returns:
         The tuple of the local x and y position of the mouse inside the parent window.
-     """
-     local_x = mouse_pos[0] - parent_root_pos[0] - offset[0]
-     local_y = mouse_pos[1] - parent_root_pos[1] - offset[1]
-     return (local_x, local_y)
+    """
+    local_x = mouse_pos[0] - parent_root_pos[0] - offset[0]
+    local_y = mouse_pos[1] - parent_root_pos[1] - offset[1]
+    return (local_x, local_y)
 
-def _set_font_size(widget: tk.Widget, font: tuple[str, int]=None, set_size: int=0, add_size: int=0):
-    """TODO"""
+def _set_font_size(
+        widget: tk.Widget,
+        font: tuple[str, int]=None,
+        set_size: int=0,
+        add_size: int=0) -> None:
+    """Set a widget's font.
+    
+    Set a font, or its size, or add onto the size.
+    """
     if font:
         widget.config(font=font)
     else:

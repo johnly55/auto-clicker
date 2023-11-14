@@ -1,9 +1,11 @@
-import tkinter as tk
+"""Main module to start program.
+
+Starts the GUI and deals with user inputs.
+"""
 import pyautogui
 from pynput.mouse import Button, Controller
 
 from gui.gui import GUI
-from action import Action
 
 APP_NAME = "John Ly's Auto Clicker"
 
@@ -11,7 +13,7 @@ APP_NAME = "John Ly's Auto Clicker"
 def main():
     """Creates a GUI instance and run it"""
     gui = GUI(APP_NAME)
-    gui.root.mainloop()
+    gui.run()
 
 if __name__ == '__main__':
     main()
